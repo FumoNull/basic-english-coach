@@ -39,7 +39,7 @@ npm run build:pages
 
 ## 部署
 
-项目包含 GitHub Pages 自动部署工作流。推送到 `master` 后，GitHub Actions 会运行 `npm run build:pages`，并把 `dist/` 发布到 GitHub Pages。
+项目包含 GitHub Pages 自动部署工作流。推送到 `main` 后，GitHub Actions 会运行 `npm run build:pages`，并把 `dist/` 发布到 GitHub Pages。
 
 第一次部署后，在仓库的 `Settings > Pages` 中确认 Source 为 `GitHub Actions`。
 
