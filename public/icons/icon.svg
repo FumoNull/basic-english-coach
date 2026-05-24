@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Basic English Coach">
+  <rect width="512" height="512" rx="96" fill="#174a5b"/>
+  <path d="M128 142c0-24 19-43 43-43h170c24 0 43 19 43 43v228c0 24-19 43-43 43H171c-24 0-43-19-43-43V142Z" fill="#f8f2df"/>
+  <path d="M177 168h158M177 226h114M177 284h158M177 342h84" stroke="#174a5b" stroke-width="28" stroke-linecap="round"/>
+  <circle cx="352" cy="350" r="48" fill="#d96f32"/>
+  <path d="m329 351 16 16 34-39" fill="none" stroke="#fff7ea" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
