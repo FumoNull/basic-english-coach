@@ -2,14 +2,15 @@
   "name": "Basic English Coach",
   "short_name": "BE Coach",
   "description": "用 Ogden Basic English 850 核心词练出简单英文表达。",
-  "start_url": "/",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "background_color": "#f5f1e8",
   "theme_color": "#174a5b",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icons/icon.svg",
+      "src": "icons/icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
