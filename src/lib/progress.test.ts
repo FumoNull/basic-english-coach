@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { ProgressState } from "../types";
-import { createInitialProgress, mergeProgress, normalizeProgress, updateAfterAttempt } from "./progress";
+import {
+  createInitialProgress,
+  createProgressTransferCode,
+  importProgressTransferCode,
+  mergeProgress,
+  normalizeProgress,
+  updateAfterAttempt,
+} from "./progress";
 
 function progress(overrides: Partial<ProgressState>): ProgressState {
   return {
@@ -101,5 +108,33 @@ describe("progress attempts", () => {
     expect(result.studyDates).toHaveLength(1);
     expect(result.streak).toBe(1);
     expect(result.updatedAt).toBeTruthy();
+  });
+});
+
+describe("progress transfer codes", () => {
+  it("exports and imports progress as a mergeable code", () => {
+    const local = progress({
+      currentDay: 1,
+      completedActivities: ["day-1-listen"],
+    });
+    const source = progress({
+      currentDay: 4,
+      completedActivities: ["day-2-vocabulary"],
+      wordMastery: {
+        book: { seen: 3, correct: 2, lastSeen: "2026-05-24" },
+      },
+    });
+
+    const code = createProgressTransferCode(source);
+    const imported = importProgressTransferCode(local, code);
+
+    expect(code.startsWith("BEC1.")).toBe(true);
+    expect(imported.currentDay).toBe(4);
+    expect(imported.completedActivities).toEqual(["day-1-listen", "day-2-vocabulary"]);
+    expect(imported.wordMastery.book.seen).toBe(3);
+  });
+
+  it("rejects invalid transfer codes", () => {
+    expect(() => importProgressTransferCode(createInitialProgress(), "not-a-code")).toThrow("进度码无法识别");
   });
 });

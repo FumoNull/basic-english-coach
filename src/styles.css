@@ -272,6 +272,45 @@ button:disabled {
   justify-content: flex-end;
 }
 
+.transfer-tools {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.transfer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.transfer-code,
+.import-box textarea {
+  width: 100%;
+  min-height: 86px;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  background: #fffdf8;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.transfer-code {
+  color: var(--muted);
+}
+
+.import-box {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
 .sync-message {
   grid-column: 1 / -1;
   margin: 0;
@@ -883,6 +922,10 @@ button:disabled {
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
+  .import-box {
+    grid-template-columns: 1fr;
+  }
+
   .side-panel {
     order: 2;
   }
@@ -934,9 +977,11 @@ button:disabled {
 
   .audio-row > button,
   .button-row > button,
+  .transfer-actions > button,
   .sync-form,
   .sync-form > button,
   .sync-actions > button,
+  .import-box > button,
   .next-button {
     width: 100%;
   }

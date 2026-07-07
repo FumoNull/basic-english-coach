@@ -3,6 +3,14 @@ import type { Activity, ProgressState, WordMastery } from "../types";
 export const STORAGE_KEY = "basic-english-coach-progress-v1";
 const COURSE_DAYS = 84;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const TRANSFER_PREFIX = "BEC1";
+
+interface ProgressTransferPayload {
+  app: "basic-english-coach";
+  version: 1;
+  exportedAt: string;
+  progress: ProgressState;
+}
 
 export function todayKey(date = new Date()) {
   const year = date.getFullYear();
@@ -187,6 +195,58 @@ function markUpdated(progress: ProgressState) {
   };
 }
 
+function bytesToBinary(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return binary;
+}
+
+function binaryToBytes(binary: string) {
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+function toBase64Url(value: string) {
+  const bytes = new TextEncoder().encode(value);
+  return btoa(bytesToBinary(bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function fromBase64Url(value: string) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return new TextDecoder().decode(binaryToBytes(atob(padded)));
+}
+
+function getPayloadFromTransferCode(code: string): ProgressTransferPayload {
+  const compactCode = code.trim().replace(/\s+/g, "");
+  const payloadCode = compactCode.startsWith(`${TRANSFER_PREFIX}.`)
+    ? compactCode.slice(TRANSFER_PREFIX.length + 1)
+    : compactCode;
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(fromBase64Url(payloadCode)) as unknown;
+  } catch {
+    throw new Error("进度码无法识别，请确认复制完整。");
+  }
+
+  if (!payload || typeof payload !== "object") {
+    throw new Error("进度码内容为空。");
+  }
+
+  const parsed = payload as Partial<ProgressTransferPayload>;
+  if (parsed.app !== "basic-english-coach" || parsed.version !== 1 || !parsed.progress) {
+    throw new Error("这不是 Basic English Coach 的进度码。");
+  }
+
+  return parsed as ProgressTransferPayload;
+}
+
 export function updateAfterAttempt(
   progress: ProgressState,
   activity: Activity,
@@ -302,6 +362,22 @@ export function mergeProgress(
     lastStudyDate,
     updatedAt: null,
   });
+}
+
+export function createProgressTransferCode(progress: ProgressState) {
+  const payload: ProgressTransferPayload = {
+    app: "basic-english-coach",
+    version: 1,
+    exportedAt: nowIso(),
+    progress: normalizeProgress(progress),
+  };
+
+  return `${TRANSFER_PREFIX}.${toBase64Url(JSON.stringify(payload))}`;
+}
+
+export function importProgressTransferCode(localProgress: ProgressState, code: string) {
+  const payload = getPayloadFromTransferCode(code);
+  return mergeProgress(localProgress, payload.progress);
 }
 
 export function resetProgress() {

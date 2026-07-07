@@ -7,6 +7,7 @@ import {
   ChevronRight,
   Circle,
   Cloud,
+  Copy,
   LogOut,
   Mail,
   PenLine,
@@ -15,6 +16,7 @@ import {
   RotateCcw,
   ShieldCheck,
   Trophy,
+  Upload,
   X,
   Volume2,
 } from "lucide-react";
@@ -29,7 +31,15 @@ import {
   syncProgressWithCloud,
   type CloudSession,
 } from "./lib/cloudSync";
-import { advanceDay, loadProgress, resetProgress, saveProgress, updateAfterAttempt } from "./lib/progress";
+import {
+  advanceDay,
+  createProgressTransferCode,
+  importProgressTransferCode,
+  loadProgress,
+  resetProgress,
+  saveProgress,
+  updateAfterAttempt,
+} from "./lib/progress";
 import { scoreActivity } from "./lib/scoring";
 import { speakText } from "./lib/speech";
 import type { Activity, AttemptResult, Lesson } from "./types";
@@ -111,6 +121,65 @@ function StatTile({
   );
 }
 
+function ProgressTransferTools({
+  transferCode,
+  importOpen,
+  importCode,
+  onExportProgress,
+  onOpenImport,
+  onCloseImport,
+  onImportCodeChange,
+  onImportProgress,
+}: {
+  transferCode: string;
+  importOpen: boolean;
+  importCode: string;
+  onExportProgress: () => void;
+  onOpenImport: () => void;
+  onCloseImport: () => void;
+  onImportCodeChange: (code: string) => void;
+  onImportProgress: () => void;
+}) {
+  return (
+    <div className="transfer-tools">
+      <div className="transfer-actions">
+        <button type="button" className="secondary-button" onClick={onExportProgress}>
+          <Copy size={18} /> 复制进度码
+        </button>
+        <button type="button" className="ghost-button" onClick={importOpen ? onCloseImport : onOpenImport}>
+          <Upload size={18} /> {importOpen ? "收起导入" : "导入进度码"}
+        </button>
+      </div>
+
+      {transferCode && (
+        <textarea
+          className="transfer-code"
+          readOnly
+          value={transferCode}
+          rows={3}
+          aria-label="当前进度码"
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
+
+      {importOpen && (
+        <div className="import-box">
+          <textarea
+            value={importCode}
+            rows={3}
+            placeholder="粘贴另一台设备的进度码"
+            aria-label="导入进度码"
+            onChange={(event) => onImportCodeChange(event.target.value)}
+          />
+          <button type="button" className="primary-button" onClick={onImportProgress} disabled={!importCode.trim()}>
+            <Upload size={18} /> 合并导入
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function SyncPanel({
   configured,
   session,
@@ -122,6 +191,14 @@ function SyncPanel({
   onRequestLink,
   onSyncNow,
   onSignOut,
+  transferCode,
+  importOpen,
+  importCode,
+  onExportProgress,
+  onOpenImport,
+  onCloseImport,
+  onImportCodeChange,
+  onImportProgress,
 }: {
   configured: boolean;
   session: CloudSession | null;
@@ -133,7 +210,28 @@ function SyncPanel({
   onRequestLink: () => void;
   onSyncNow: () => void;
   onSignOut: () => void;
+  transferCode: string;
+  importOpen: boolean;
+  importCode: string;
+  onExportProgress: () => void;
+  onOpenImport: () => void;
+  onCloseImport: () => void;
+  onImportCodeChange: (code: string) => void;
+  onImportProgress: () => void;
 }) {
+  const transferTools = (
+    <ProgressTransferTools
+      transferCode={transferCode}
+      importOpen={importOpen}
+      importCode={importCode}
+      onExportProgress={onExportProgress}
+      onOpenImport={onOpenImport}
+      onCloseImport={onCloseImport}
+      onImportCodeChange={onImportCodeChange}
+      onImportProgress={onImportProgress}
+    />
+  );
+
   if (!configured) {
     return (
       <section className="sync-panel">
@@ -144,6 +242,8 @@ function SyncPanel({
             <span>配置云同步后，手机和电脑会共用同一份学习进度。</span>
           </div>
         </div>
+        {transferTools}
+        {message && <p className={`sync-message ${tone}`}>{message}</p>}
       </section>
     );
   }
@@ -179,6 +279,7 @@ function SyncPanel({
             {busy ? "发送中" : "发送登录链接"}
           </button>
         </form>
+        {transferTools}
         {message && <p className={`sync-message ${tone}`}>{message}</p>}
       </section>
     );
@@ -201,6 +302,7 @@ function SyncPanel({
           <LogOut size={18} /> 退出
         </button>
       </div>
+      {transferTools}
       {message && <p className={`sync-message ${tone}`}>{message}</p>}
     </section>
   );
@@ -568,6 +670,9 @@ export default function App() {
   const [syncReady, setSyncReady] = useState(!syncConfig.configured);
   const [syncMessage, setSyncMessage] = useState(syncConfig.configured ? "" : "当前仅保存在本机。");
   const [syncTone, setSyncTone] = useState<SyncTone>("quiet");
+  const [transferCode, setTransferCode] = useState("");
+  const [importOpen, setImportOpen] = useState(false);
+  const [importCode, setImportCode] = useState("");
   const latestProgressRef = useRef(progress);
   const lastSyncedSnapshotRef = useRef<string | null>(null);
   const lesson = lessons[progress.currentDay - 1] ?? lessons[0];
@@ -700,6 +805,38 @@ export default function App() {
     setSyncMessage("已退出云同步，本机进度仍会保留。");
   }
 
+  async function handleExportProgress() {
+    const code = createProgressTransferCode(latestProgressRef.current);
+    setTransferCode(code);
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(code);
+      setSyncTone("success");
+      setSyncMessage("进度码已复制，可以发到另一台设备导入。");
+    } catch {
+      setSyncTone("quiet");
+      setSyncMessage("进度码已生成，可以手动复制。");
+    }
+  }
+
+  function handleImportProgress() {
+    try {
+      const merged = importProgressTransferCode(latestProgressRef.current, importCode);
+      setProgress(merged);
+      setImportCode("");
+      setImportOpen(false);
+      setTransferCode("");
+      setSyncTone("success");
+      setSyncMessage("进度已合并导入。");
+    } catch (error) {
+      setSyncTone("error");
+      setSyncMessage(error instanceof Error ? error.message : "进度码导入失败。");
+    }
+  }
+
   const activeActivity = lesson.activities[activeIndex] ?? lesson.activities[0];
   const completedForLesson = completionRatio(lesson, progress.completedActivities);
   const lessonDone = completedForLesson === 1;
@@ -763,6 +900,16 @@ export default function App() {
           }
         }}
         onSignOut={handleSignOut}
+        transferCode={transferCode}
+        importOpen={importOpen}
+        importCode={importCode}
+        onExportProgress={() => {
+          void handleExportProgress();
+        }}
+        onOpenImport={() => setImportOpen(true)}
+        onCloseImport={() => setImportOpen(false)}
+        onImportCodeChange={setImportCode}
+        onImportProgress={handleImportProgress}
       />
 
       <section className="main-grid">
