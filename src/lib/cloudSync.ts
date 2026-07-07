@@ -131,7 +131,7 @@ function getRedirectTo() {
     return undefined;
   }
 
-  return new URL(import.meta.env.BASE_URL, window.location.origin).toString();
+  return `${window.location.origin}${window.location.pathname}${window.location.search}`;
 }
 
 function saveCloudSession(session: CloudSession) {

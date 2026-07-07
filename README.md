@@ -58,7 +58,11 @@ npm run build:pages
 2. 打开 Supabase SQL Editor，执行 [supabase.sql](./supabase.sql)。
 3. 在 Supabase `Authentication > URL Configuration` 中设置：
    - Site URL: `https://fumonull.github.io/basic-english-coach/`
-   - Redirect URLs: `https://fumonull.github.io/basic-english-coach/` 和本地开发地址，例如 `http://127.0.0.1:5175/`
+   - Redirect URLs:
+     - `https://fumonull.github.io/basic-english-coach/`
+     - `https://fumonull.github.io/basic-english-coach/index.html`
+     - `http://127.0.0.1:5175/`
+     - `http://127.0.0.1:5175/index.html`
 4. 在 GitHub 仓库 `Settings > Secrets and variables > Actions > Variables` 添加：
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
