@@ -131,6 +131,11 @@ function getRedirectTo() {
     return undefined;
   }
 
+  const baseUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+  if (baseUrl.pathname !== "/") {
+    return baseUrl.toString();
+  }
+
   return `${window.location.origin}${window.location.pathname}${window.location.search}`;
 }
 
