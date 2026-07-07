@@ -8,6 +8,7 @@ import {
   Circle,
   Cloud,
   Copy,
+  Link as LinkIcon,
   LogOut,
   Mail,
   PenLine,
@@ -33,11 +34,14 @@ import {
 } from "./lib/cloudSync";
 import {
   advanceDay,
+  createProgressTransferHash,
   createProgressTransferCode,
+  getProgressTransferCodeFromHash,
   importProgressTransferCode,
   loadProgress,
   resetProgress,
   saveProgress,
+  TRANSFER_HASH_KEY,
   updateAfterAttempt,
 } from "./lib/progress";
 import { scoreActivity } from "./lib/scoring";
@@ -98,6 +102,35 @@ function formatSyncTime(date = new Date()) {
   });
 }
 
+function createProgressImportUrl(progressHash: string) {
+  if (typeof window === "undefined") {
+    return "";
+  }
+
+  const url = new URL(window.location.href);
+  url.hash = progressHash;
+  return url.toString();
+}
+
+function removeProgressImportHash() {
+  if (typeof window === "undefined" || !window.location.hash) {
+    return;
+  }
+
+  const params = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (!params.has(TRANSFER_HASH_KEY)) {
+    return;
+  }
+
+  params.delete(TRANSFER_HASH_KEY);
+  const nextHash = params.toString();
+  window.history.replaceState(
+    null,
+    document.title,
+    `${window.location.pathname}${window.location.search}${nextHash ? `#${nextHash}` : ""}`
+  );
+}
+
 function StatTile({
   icon,
   label,
@@ -123,18 +156,22 @@ function StatTile({
 
 function ProgressTransferTools({
   transferCode,
+  transferLink,
   importOpen,
   importCode,
   onExportProgress,
+  onExportLink,
   onOpenImport,
   onCloseImport,
   onImportCodeChange,
   onImportProgress,
 }: {
   transferCode: string;
+  transferLink: string;
   importOpen: boolean;
   importCode: string;
   onExportProgress: () => void;
+  onExportLink: () => void;
   onOpenImport: () => void;
   onCloseImport: () => void;
   onImportCodeChange: (code: string) => void;
@@ -143,6 +180,9 @@ function ProgressTransferTools({
   return (
     <div className="transfer-tools">
       <div className="transfer-actions">
+        <button type="button" className="secondary-button" onClick={onExportLink}>
+          <LinkIcon size={18} /> 复制导入链接
+        </button>
         <button type="button" className="secondary-button" onClick={onExportProgress}>
           <Copy size={18} /> 复制进度码
         </button>
@@ -158,6 +198,17 @@ function ProgressTransferTools({
           value={transferCode}
           rows={3}
           aria-label="当前进度码"
+          onFocus={(event) => event.currentTarget.select()}
+        />
+      )}
+
+      {transferLink && (
+        <textarea
+          className="transfer-code"
+          readOnly
+          value={transferLink}
+          rows={2}
+          aria-label="当前进度导入链接"
           onFocus={(event) => event.currentTarget.select()}
         />
       )}
@@ -192,9 +243,11 @@ function SyncPanel({
   onSyncNow,
   onSignOut,
   transferCode,
+  transferLink,
   importOpen,
   importCode,
   onExportProgress,
+  onExportLink,
   onOpenImport,
   onCloseImport,
   onImportCodeChange,
@@ -211,9 +264,11 @@ function SyncPanel({
   onSyncNow: () => void;
   onSignOut: () => void;
   transferCode: string;
+  transferLink: string;
   importOpen: boolean;
   importCode: string;
   onExportProgress: () => void;
+  onExportLink: () => void;
   onOpenImport: () => void;
   onCloseImport: () => void;
   onImportCodeChange: (code: string) => void;
@@ -222,9 +277,11 @@ function SyncPanel({
   const transferTools = (
     <ProgressTransferTools
       transferCode={transferCode}
+      transferLink={transferLink}
       importOpen={importOpen}
       importCode={importCode}
       onExportProgress={onExportProgress}
+      onExportLink={onExportLink}
       onOpenImport={onOpenImport}
       onCloseImport={onCloseImport}
       onImportCodeChange={onImportCodeChange}
@@ -677,6 +734,7 @@ export default function App() {
   const [syncMessage, setSyncMessage] = useState(syncConfig.configured ? "" : "当前仅保存在本机。");
   const [syncTone, setSyncTone] = useState<SyncTone>("quiet");
   const [transferCode, setTransferCode] = useState("");
+  const [transferLink, setTransferLink] = useState("");
   const [importOpen, setImportOpen] = useState(false);
   const [importCode, setImportCode] = useState("");
   const latestProgressRef = useRef(progress);
@@ -688,6 +746,29 @@ export default function App() {
     saveProgress(progress);
     latestProgressRef.current = progress;
   }, [progress]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const code = getProgressTransferCodeFromHash(window.location.hash);
+    if (!code) {
+      return;
+    }
+
+    try {
+      const merged = importProgressTransferCode(latestProgressRef.current, code);
+      setProgress(merged);
+      setSyncTone("success");
+      setSyncMessage("已从导入链接合并进度。");
+    } catch (error) {
+      setSyncTone("error");
+      setSyncMessage(error instanceof Error ? error.message : "进度导入链接无效。");
+    } finally {
+      removeProgressImportHash();
+    }
+  }, []);
 
   useEffect(() => {
     const firstIncomplete = lesson.activities.findIndex((activity) => !progress.completedActivities.includes(activity.id));
@@ -814,6 +895,7 @@ export default function App() {
   async function handleExportProgress() {
     const code = createProgressTransferCode(latestProgressRef.current);
     setTransferCode(code);
+    setTransferLink("");
 
     try {
       if (!navigator.clipboard?.writeText) {
@@ -828,6 +910,25 @@ export default function App() {
     }
   }
 
+  async function handleExportLink() {
+    const progressHash = createProgressTransferHash(latestProgressRef.current);
+    const link = createProgressImportUrl(progressHash);
+    setTransferCode("");
+    setTransferLink(link);
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard unavailable");
+      }
+      await navigator.clipboard.writeText(link);
+      setSyncTone("success");
+      setSyncMessage("导入链接已复制，发到手机打开就能合并进度。");
+    } catch {
+      setSyncTone("quiet");
+      setSyncMessage("导入链接已生成，可以手动复制。");
+    }
+  }
+
   function handleImportProgress() {
     try {
       const merged = importProgressTransferCode(latestProgressRef.current, importCode);
@@ -835,6 +936,7 @@ export default function App() {
       setImportCode("");
       setImportOpen(false);
       setTransferCode("");
+      setTransferLink("");
       setSyncTone("success");
       setSyncMessage("进度已合并导入。");
     } catch (error) {
@@ -907,10 +1009,14 @@ export default function App() {
         }}
         onSignOut={handleSignOut}
         transferCode={transferCode}
+        transferLink={transferLink}
         importOpen={importOpen}
         importCode={importCode}
         onExportProgress={() => {
           void handleExportProgress();
+        }}
+        onExportLink={() => {
+          void handleExportLink();
         }}
         onOpenImport={() => setImportOpen(true)}
         onCloseImport={() => setImportOpen(false)}

@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { ProgressState } from "../types";
 import {
   createInitialProgress,
+  createProgressTransferHash,
   createProgressTransferCode,
+  getProgressTransferCodeFromHash,
   importProgressTransferCode,
   mergeProgress,
   normalizeProgress,
@@ -136,5 +138,21 @@ describe("progress transfer codes", () => {
 
   it("rejects invalid transfer codes", () => {
     expect(() => importProgressTransferCode(createInitialProgress(), "not-a-code")).toThrow("进度码无法识别");
+  });
+
+  it("creates and reads transfer hashes for import links", () => {
+    const source = progress({
+      currentDay: 5,
+      completedActivities: ["day-4-review"],
+    });
+
+    const hash = createProgressTransferHash(source);
+    const code = getProgressTransferCodeFromHash(`#${hash}`);
+    const imported = importProgressTransferCode(createInitialProgress(), code ?? "");
+
+    expect(hash.startsWith("bec_progress=")).toBe(true);
+    expect(code?.startsWith("BEC1.")).toBe(true);
+    expect(imported.currentDay).toBe(5);
+    expect(imported.completedActivities).toEqual(["day-4-review"]);
   });
 });

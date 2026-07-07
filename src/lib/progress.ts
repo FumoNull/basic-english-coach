@@ -4,6 +4,7 @@ export const STORAGE_KEY = "basic-english-coach-progress-v1";
 const COURSE_DAYS = 84;
 const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const TRANSFER_PREFIX = "BEC1";
+export const TRANSFER_HASH_KEY = "bec_progress";
 
 interface ProgressTransferPayload {
   app: "basic-english-coach";
@@ -373,6 +374,16 @@ export function createProgressTransferCode(progress: ProgressState) {
   };
 
   return `${TRANSFER_PREFIX}.${toBase64Url(JSON.stringify(payload))}`;
+}
+
+export function createProgressTransferHash(progress: ProgressState) {
+  return `${TRANSFER_HASH_KEY}=${encodeURIComponent(createProgressTransferCode(progress))}`;
+}
+
+export function getProgressTransferCodeFromHash(hash: string) {
+  const params = new URLSearchParams(hash.replace(/^#/, ""));
+  const code = params.get(TRANSFER_HASH_KEY)?.trim();
+  return code && code.length > 0 ? code : null;
 }
 
 export function importProgressTransferCode(localProgress: ProgressState, code: string) {

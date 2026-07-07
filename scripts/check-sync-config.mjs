@@ -69,7 +69,12 @@ function hasSupabaseConfig(js) {
 }
 
 function hasSyncUi(js) {
-  return js.includes("发送登录链接") && js.includes("复制进度码") && js.includes("合并导入");
+  return (
+    js.includes("发送登录链接") &&
+    js.includes("复制导入链接") &&
+    js.includes("复制进度码") &&
+    js.includes("合并导入")
+  );
 }
 
 async function main() {
