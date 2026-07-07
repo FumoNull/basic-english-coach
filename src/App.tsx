@@ -238,11 +238,17 @@ function SyncPanel({
         <div className="sync-title">
           <Cloud size={20} />
           <div>
-            <strong>本地进度</strong>
-            <span>配置云同步后，手机和电脑会共用同一份学习进度。</span>
+            <strong>本机保存</strong>
+            <span>换设备学习时，先复制进度码，再到另一台设备合并导入。</span>
           </div>
         </div>
         {transferTools}
+        <details className="sync-setup">
+          <summary>开启自动云同步</summary>
+          <p>部署者在 GitHub Actions Variables 填入 Supabase 配置并重新部署后，这里会出现邮箱登录。</p>
+          <code>VITE_SUPABASE_URL</code>
+          <code>VITE_SUPABASE_ANON_KEY</code>
+        </details>
         {message && <p className={`sync-message ${tone}`}>{message}</p>}
       </section>
     );

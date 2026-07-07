@@ -311,6 +311,38 @@ button:disabled {
   align-items: end;
 }
 
+.sync-setup {
+  grid-column: 1 / -1;
+  padding: 10px 12px;
+  border: 1px dashed rgba(23, 74, 91, 0.26);
+  border-radius: 8px;
+  color: var(--muted);
+  background: #fcfbf6;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sync-setup summary {
+  color: var(--teal);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.sync-setup p {
+  margin: 8px 0 10px;
+}
+
+.sync-setup code {
+  display: inline-block;
+  max-width: 100%;
+  margin: 0 8px 6px 0;
+  padding: 4px 7px;
+  border-radius: 6px;
+  color: var(--teal);
+  background: var(--teal-soft);
+  overflow-wrap: anywhere;
+}
+
 .sync-message {
   grid-column: 1 / -1;
   margin: 0;
