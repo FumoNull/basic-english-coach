@@ -44,6 +44,7 @@ VITE_SUPABASE_ANON_KEY=your-public-anon-key
 npm run test
 npm run build
 npm run build:pages
+npm run check:sync
 ```
 
 ## 部署
@@ -67,6 +68,7 @@ npm run build:pages
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
 5. 推送到 `main` 或手动运行 Pages workflow。
+6. 部署完成后运行 `npm run check:sync:required`。如果命令通过，说明线上包已经注入 Supabase 配置；如果失败，网站仍会停留在本机保存和进度码迁移模式。
 
 云同步采用本地优先策略：离线时仍会保存在本机；登录后会把本地和云端进度合并，已完成活动取并集，当前天数取更靠后的进度，词汇掌握度保留更高记录。
 
