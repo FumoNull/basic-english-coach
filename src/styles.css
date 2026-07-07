@@ -33,6 +33,7 @@ body {
 }
 
 button,
+input,
 textarea {
   font: inherit;
 }
@@ -42,6 +43,7 @@ button {
 }
 
 button:focus-visible,
+input:focus-visible,
 textarea:focus-visible {
   outline: 3px solid rgba(199, 95, 43, 0.38);
   outline-offset: 3px;
@@ -189,6 +191,103 @@ button:disabled {
   display: block;
   margin-top: 6px;
   color: var(--muted);
+}
+
+.sync-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  margin: -4px 0 18px;
+  padding: 14px 16px;
+  border: 1px solid rgba(217, 222, 216, 0.95);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 12px 30px rgba(24, 45, 51, 0.07);
+}
+
+.sync-title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  color: var(--teal);
+}
+
+.sync-title strong,
+.sync-title span {
+  display: block;
+}
+
+.sync-title strong {
+  font-size: 1rem;
+}
+
+.sync-title span {
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.sync-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.sync-form label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--teal);
+  background: #fffdf8;
+}
+
+.sync-form label:focus-within {
+  border-color: rgba(199, 95, 43, 0.65);
+  box-shadow: 0 0 0 3px rgba(199, 95, 43, 0.14);
+}
+
+.sync-form input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  outline: 0;
+}
+
+.sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.sync-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.sync-message.success {
+  color: var(--green);
+  font-weight: 800;
+}
+
+.sync-message.error {
+  color: var(--rust);
+  font-weight: 800;
 }
 
 .main-grid {
@@ -775,8 +874,13 @@ button:disabled {
   }
 
   .dashboard-band,
+  .sync-panel,
   .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .sync-form {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .side-panel {
@@ -830,7 +934,14 @@ button:disabled {
 
   .audio-row > button,
   .button-row > button,
+  .sync-form,
+  .sync-form > button,
+  .sync-actions > button,
   .next-button {
     width: 100%;
+  }
+
+  .sync-form {
+    grid-template-columns: 1fr;
   }
 }

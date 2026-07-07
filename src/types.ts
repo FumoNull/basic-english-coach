@@ -57,8 +57,10 @@ export interface ProgressState {
   completedActivities: string[];
   wordMastery: Record<string, WordMastery>;
   mistakes: Record<string, number>;
+  studyDates: string[];
   streak: number;
   lastStudyDate: string | null;
+  updatedAt: string | null;
 }
 
 export interface AttemptResult {

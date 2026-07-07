@@ -1,4 +1,4 @@
-const CACHE_NAME = "basic-english-coach-v2";
+const CACHE_NAME = "basic-english-coach-v3";
 const APP_SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon.svg"];
 
 const scopedUrl = (path) => new URL(path, self.registration.scope).toString();
@@ -21,6 +21,23 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") {
+    return;
+  }
+
+  const acceptsHtml = event.request.headers.get("accept")?.includes("text/html");
+  if (event.request.mode === "navigate" || acceptsHtml) {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(scopedUrl("./index.html"), clone));
+          }
+
+          return response;
+        })
+        .catch(() => caches.match(scopedUrl("./index.html")))
+    );
     return;
   }
 

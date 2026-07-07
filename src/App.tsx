@@ -6,6 +6,9 @@ import {
   ChevronLeft,
   ChevronRight,
   Circle,
+  Cloud,
+  LogOut,
+  Mail,
   PenLine,
   Play,
   RefreshCw,
@@ -17,6 +20,15 @@ import {
 } from "lucide-react";
 import { basicWords } from "./data/basicWords";
 import { COURSE_LENGTH_DAYS, lessons } from "./data/lessons";
+import {
+  clearCloudSession,
+  consumeCloudAuthRedirect,
+  getCloudSyncConfigStatus,
+  loadCloudSession,
+  requestMagicLink,
+  syncProgressWithCloud,
+  type CloudSession,
+} from "./lib/cloudSync";
 import { advanceDay, loadProgress, resetProgress, saveProgress, updateAfterAttempt } from "./lib/progress";
 import { scoreActivity } from "./lib/scoring";
 import { speakText } from "./lib/speech";
@@ -43,6 +55,8 @@ const categoryLabels = {
   general: "抽象词",
 };
 
+type SyncTone = "quiet" | "success" | "error";
+
 function getActivityBadge(activity: Activity) {
   if (activity.id.includes("yesterday-review")) return "昨";
   if (activity.id.includes("today-output")) return "出";
@@ -67,6 +81,13 @@ function makeSelfCheckResult(): AttemptResult {
   };
 }
 
+function formatSyncTime(date = new Date()) {
+  return date.toLocaleTimeString("zh-CN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function StatTile({
   icon,
   label,
@@ -87,6 +108,101 @@ function StatTile({
         <small>{detail}</small>
       </div>
     </div>
+  );
+}
+
+function SyncPanel({
+  configured,
+  session,
+  email,
+  busy,
+  message,
+  tone,
+  onEmailChange,
+  onRequestLink,
+  onSyncNow,
+  onSignOut,
+}: {
+  configured: boolean;
+  session: CloudSession | null;
+  email: string;
+  busy: boolean;
+  message: string;
+  tone: SyncTone;
+  onEmailChange: (email: string) => void;
+  onRequestLink: () => void;
+  onSyncNow: () => void;
+  onSignOut: () => void;
+}) {
+  if (!configured) {
+    return (
+      <section className="sync-panel">
+        <div className="sync-title">
+          <Cloud size={20} />
+          <div>
+            <strong>本地进度</strong>
+            <span>配置云同步后，手机和电脑会共用同一份学习进度。</span>
+          </div>
+        </div>
+      </section>
+    );
+  }
+
+  if (!session) {
+    return (
+      <section className="sync-panel">
+        <div className="sync-title">
+          <Cloud size={20} />
+          <div>
+            <strong>云同步</strong>
+            <span>用邮箱登录后，手机和电脑会自动同步进度。</span>
+          </div>
+        </div>
+        <form
+          className="sync-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            onRequestLink();
+          }}
+        >
+          <label>
+            <Mail size={18} />
+            <input
+              type="email"
+              value={email}
+              placeholder="输入邮箱"
+              autoComplete="email"
+              onChange={(event) => onEmailChange(event.target.value)}
+            />
+          </label>
+          <button type="submit" className="primary-button" disabled={busy || !email.trim()}>
+            {busy ? "发送中" : "发送登录链接"}
+          </button>
+        </form>
+        {message && <p className={`sync-message ${tone}`}>{message}</p>}
+      </section>
+    );
+  }
+
+  return (
+    <section className="sync-panel connected">
+      <div className="sync-title">
+        <Cloud size={20} />
+        <div>
+          <strong>云同步已开启</strong>
+          <span>{session.user.email ?? "已登录账号"}</span>
+        </div>
+      </div>
+      <div className="sync-actions">
+        <button type="button" className="secondary-button" onClick={onSyncNow} disabled={busy}>
+          <RefreshCw size={18} /> {busy ? "同步中" : "立即同步"}
+        </button>
+        <button type="button" className="ghost-button" onClick={onSignOut}>
+          <LogOut size={18} /> 退出
+        </button>
+      </div>
+      {message && <p className={`sync-message ${tone}`}>{message}</p>}
+    </section>
   );
 }
 
@@ -445,17 +561,144 @@ function WordFocus({ lesson }: { lesson: Lesson }) {
 
 export default function App() {
   const [progress, setProgress] = useState(loadProgress);
+  const syncConfig = getCloudSyncConfigStatus();
+  const [syncSession, setSyncSession] = useState<CloudSession | null>(() => loadCloudSession());
+  const [syncEmail, setSyncEmail] = useState("");
+  const [syncBusy, setSyncBusy] = useState(false);
+  const [syncReady, setSyncReady] = useState(!syncConfig.configured);
+  const [syncMessage, setSyncMessage] = useState(syncConfig.configured ? "" : "当前仅保存在本机。");
+  const [syncTone, setSyncTone] = useState<SyncTone>("quiet");
+  const latestProgressRef = useRef(progress);
+  const lastSyncedSnapshotRef = useRef<string | null>(null);
   const lesson = lessons[progress.currentDay - 1] ?? lessons[0];
   const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     saveProgress(progress);
+    latestProgressRef.current = progress;
   }, [progress]);
 
   useEffect(() => {
     const firstIncomplete = lesson.activities.findIndex((activity) => !progress.completedActivities.includes(activity.id));
     setActiveIndex(firstIncomplete >= 0 ? firstIncomplete : 0);
-  }, [lesson.id]);
+  }, [lesson.id, progress.completedActivities]);
+
+  async function runCloudSync(session: CloudSession, mode: "initial" | "manual" | "auto") {
+    if (!syncConfig.configured) {
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncTone("quiet");
+    setSyncMessage(mode === "auto" ? "正在保存到云端..." : "正在同步云端进度...");
+
+    try {
+      const result = await syncProgressWithCloud(session, latestProgressRef.current);
+      lastSyncedSnapshotRef.current = JSON.stringify(result.progress);
+      setSyncSession(result.session);
+      setProgress(result.progress);
+      setSyncTone("success");
+      setSyncMessage(
+        result.pulledRemote ? `云端进度已合并 ${formatSyncTime()}` : `云端进度已保存 ${formatSyncTime()}`
+      );
+    } catch (error) {
+      if (mode === "auto") {
+        lastSyncedSnapshotRef.current = JSON.stringify(latestProgressRef.current);
+      }
+      setSyncTone("error");
+      setSyncMessage(error instanceof Error ? error.message : "云同步失败，请稍后再试。");
+    } finally {
+      setSyncBusy(false);
+      setSyncReady(true);
+    }
+  }
+
+  useEffect(() => {
+    if (!syncConfig.configured) {
+      setSyncReady(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function initializeCloudSync() {
+      try {
+        const redirectSession = await consumeCloudAuthRedirect();
+        const session = redirectSession ?? loadCloudSession();
+
+        if (cancelled) {
+          return;
+        }
+
+        if (!session) {
+          setSyncReady(true);
+          return;
+        }
+
+        setSyncSession(session);
+        await runCloudSync(session, "initial");
+      } catch (error) {
+        if (!cancelled) {
+          setSyncTone("error");
+          setSyncMessage(error instanceof Error ? error.message : "云同步初始化失败。");
+          setSyncReady(true);
+        }
+      }
+    }
+
+    void initializeCloudSync();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!syncReady || !syncSession || syncBusy || !syncConfig.configured) {
+      return;
+    }
+
+    const snapshot = JSON.stringify(progress);
+    if (lastSyncedSnapshotRef.current === snapshot) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      void runCloudSync(syncSession, "auto");
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [progress, syncReady, syncSession, syncBusy, syncConfig.configured]);
+
+  async function handleRequestMagicLink() {
+    const email = syncEmail.trim();
+    if (!email) {
+      return;
+    }
+
+    setSyncBusy(true);
+    setSyncTone("quiet");
+    setSyncMessage("正在发送登录链接...");
+
+    try {
+      await requestMagicLink(email);
+      setSyncTone("success");
+      setSyncMessage("登录链接已发送，请在邮箱中打开链接完成同步。");
+    } catch (error) {
+      setSyncTone("error");
+      setSyncMessage(error instanceof Error ? error.message : "登录链接发送失败。");
+    } finally {
+      setSyncBusy(false);
+    }
+  }
+
+  function handleSignOut() {
+    clearCloudSession();
+    setSyncSession(null);
+    lastSyncedSnapshotRef.current = null;
+    setSyncTone("quiet");
+    setSyncMessage("已退出云同步，本机进度仍会保留。");
+  }
 
   const activeActivity = lesson.activities[activeIndex] ?? lesson.activities[0];
   const completedForLesson = completionRatio(lesson, progress.completedActivities);
@@ -504,6 +747,23 @@ export default function App() {
         <StatTile icon={<Trophy size={22} />} label="连续学习" value={`${progress.streak} 天`} detail={progress.lastStudyDate ?? "尚未开始"} />
         <StatTile icon={<BookOpen size={22} />} label="掌握词汇" value={`${masteredWords}`} detail={`已接触 ${totalSeen} 个`} />
       </section>
+
+      <SyncPanel
+        configured={syncConfig.configured}
+        session={syncSession}
+        email={syncEmail}
+        busy={syncBusy}
+        message={syncMessage}
+        tone={syncTone}
+        onEmailChange={setSyncEmail}
+        onRequestLink={handleRequestMagicLink}
+        onSyncNow={() => {
+          if (syncSession) {
+            void runCloudSync(syncSession, "manual");
+          }
+        }}
+        onSignOut={handleSignOut}
+      />
 
       <section className="main-grid">
         <aside className="side-panel">
